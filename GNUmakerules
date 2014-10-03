@@ -1,0 +1,77 @@
+#
+# Copyright (c) 1995-1996, 1998, 1999, 2000 University of Utah and the Flux Group.
+# All rights reserved.
+# 
+# This file is part of the Flux OSKit.  The OSKit is free software, also known
+# as "open source;" you can redistribute it and/or modify it under the terms
+# of the GNU General Public License (GPL), version 2, as published by the Free
+# Software Foundation (FSF).  To explore alternate licensing terms, contact
+# the University of Utah at csl-dist@cs.utah.edu or +1-801-585-3271.
+# 
+# The OSKit is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GPL for more details.  You should have
+# received a copy of the GPL along with the OSKit; see the file COPYING.  If
+# not, write to the FSF, 59 Temple Place #330, Boston, MA 02111-1307, USA.
+#
+
+#
+# Note: applications that use the Linux dev library need to link
+# in dummy.o to make sure that mem_lock from libkern gets linked in
+# rather than the one from libc.
+# This is because Linux interrupt handlers allocate memory.
+# If you don't do this, you will experience random LMM trashing
+# and other Strange memory bugs.
+#
+
+ifndef _oskit_examples_x86_makerules_
+_oskit_examples_x86_makerules__ = yes
+
+TARGETS = netstack
+
+all: $(TARGETS)
+
+prepare::
+
+NETSTACKDIR = /proj/netstack
+
+#Not all of these srcdirs are even being used anymore
+#SRCDIRS +=	$(OSKIT_SRCDIR)/examples/x86/shared
+
+INCDIRS +=	$(OSKIT_SRCDIR)/oskit/c	\
+		$(OSKIT_SRCDIR)/examples/x86/shared \
+		$(OSKIT_SRCDIR)/linux/src/include \
+		$(NETSTACKDIR) \
+		/usr/include
+CLEAN_FILES +=	$(TARGETS) *.gdb
+OSKIT_CFLAGS += -DOSKIT
+
+NETSTACK_OBJ_DIR = /proj/netstack
+
+#
+# The C library is made up of several pieces. The core library, the
+# POSIX interface that converts syscalls to COM, and the actual COM 
+# interfaces. Note that the C library is built with the COM library.
+#
+CLIB   = -loskit_c   
+CLIB_P = -loskit_c_p -loskit_gprof -loskit_c_p -loskit_kern_p 
+
+include $(OSKIT_SRCDIR)/GNUmakerules
+
+NETSTACKOBJECTS = $(OBJDIR)/lib/multiboot.o \
+	$(NETSTACK_OBJ_DIR)/main.o $(NETSTACK_OBJ_DIR)/arphash.o \
+	$(NETSTACK_OBJ_DIR)/recv.o $(NETSTACK_OBJ_DIR)/send.o \
+	$(NETSTACK_OBJ_DIR)/sched.o $(NETSTACK_OBJ_DIR)/network_help.o \
+	$(NETSTACK_OBJ_DIR)/netprintf.o $(NETSTACK_OBJ_DIR)/netstacksend.o \
+	netstack.o 
+
+netstack:  $(NETSTACKOBJECTS) 
+	$(OSKIT_QUIET_MAKE_INFORM) "Linking netstack project"
+	$(LD) -Ttext 100000 $(LDFLAGS) $(OSKIT_LDFLAGS) \
+		-o $@  $(NETSTACKOBJECTS) \
+		-loskit_startup -loskit_clientos \
+		-loskit_linux_dev -loskit_dev -loskit_kern -loskit_lmm \
+		$(CLIB) $(OBJDIR)/lib/crtn.o 
+	gzip -f netstack
+
+endif
